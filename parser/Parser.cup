@@ -1,0 +1,229 @@
+package parser;
+
+import java.util.*;
+import java.io.*;
+import java_cup.runtime.Symbol;
+import java_cup.runtime.ComplexSymbolFactory.ComplexSymbol;
+import java_cup.runtime.ComplexSymbolFactory;
+
+import ast.*;
+import interpreter.Interpreter;
+
+parser code {: 
+  Lexer lexer;
+
+  public Parser(Lexer lex, ComplexSymbolFactory sf) {
+    super(lex, sf);
+    lexer = lex;
+  }
+
+  public void report_fatal_error(String message, Object info) {
+    Interpreter.fatalError(message + " (" + info + ")", Interpreter.EXIT_PARSING_ERROR);
+  }
+
+  ast.Location loc(int line, int column) {
+    return new ast.Location(line, column);
+  }
+
+:};
+
+terminal NIL, INT, REF, Q, MUTABLE, RETURN, WHILE, IF, ELSE, PRINT, RCURLY,   
+         LCURLY, LPAREN, RPAREN, RBRACKET, LBRACKET, SEMI, EQUAL, LESS, GREATER, SAME, LESSEQUAL, GREATEREQUAL, 
+         NOTEQUAL, OR, AND, NOT, COMMA, DOT, CAST, PLUS, MINUS, MULTIPLY, UMINUS;
+
+
+terminal Long   INTCONST;
+terminal String IDENT;
+
+non terminal Program         program;
+non terminal FuncDef         funcDef; 
+non terminal FuncDefList     funcDefList;
+non terminal VarDecl         varDecl;
+non terminal Type            type;
+non terminal FormalDeclList  formalDeclList; 
+non terminal FormalDeclList  neFormalDeclList;
+non terminal StmtList        stmtList;
+non terminal Stmt            stmt;
+non terminal Expr            expr;
+non terminal ExprList        exprList;
+non terminal ExprList        neExprList;
+non terminal BinaryExpr      binaryExpr;
+non terminal Cond            cond;
+non terminal CallExpr        CallExpr;
+
+
+//Highest lowest 
+
+precedence left AND, OR;
+precedence left NOT;
+precedence left LESSEQUAL, GREATEREQUAL, SAME, NOTEQUAL, LESS, GREATER;
+precedence left DOT;
+precedence left PLUS, MINUS;
+precedence left MULTIPLY;
+precedence left UMINUS;
+precedence left CAST;
+precedence left IF;
+precedence left ELSE;
+
+
+
+start with program;
+
+program ::= funcDefList:fdl
+            {: RESULT = new Program(fdl, loc(fdlleft, fdlright)); :}
+         ;
+
+funcDefList ::= funcDef:fd funcDefList:fdl
+            {: RESULT = new FuncDefList(fd, fdl, loc(fdleft, fdlright)); :}
+            | /*Empty String*/
+            {: RESULT = null; :}
+         ;
+
+funcDef ::= varDecl:vd LPAREN formalDeclList:frl RPAREN RCURLY stmtList:sl LCURLY
+            {: RESULT = new FuncDef(vd, frl, sl, loc(vdleft, vdright)); :}
+         ;
+         
+                  
+varDecl ::= type:t IDENT:i 
+         {: RESULT = new VarDecl(i, t, false); :} 
+         |  MUTABLE type:t IDENT:i 
+         {: RESULT = new VarDecl(i, t, true); :}
+         ;
+         
+type ::= INT
+         {: RESULT = Type.INT; :}
+         |Q
+         {: RESULT = Type.Q; :}
+         |REF
+         {: RESULT = Type.REF; :}
+         ;
+
+formalDeclList ::= neFormalDeclList:nfrl
+         {: RESULT = nfrl; :}
+         |
+         {: RESULT = null; :}
+         ;
+
+neFormalDeclList ::= varDecl:vd COMMA neFormalDeclList:nfrl
+         {: RESULT = new FormalDeclList(vd, nfrl, loc(vdleft, vdright));:}
+         |
+         varDecl:vd
+         {: RESULT = new FormalDeclList(vd, null, loc(vdleft, vdright));:}
+         ;
+
+exprList ::= neExprList:nel
+         {: RESULT = nel; :}
+         |
+         {: RESULT = null; :}
+         ;
+
+neExprList ::= expr:e COMMA neExprList:nel
+         {: RESULT = new ExprList(e, nel, loc(eleft, eright)); :}
+         |
+         expr:e
+         {:RESULT = new ExprList(e, null, loc(eleft, eright)); :}
+         ;               
+
+stmtList ::= stmt:s stmtList:sl 
+            {: RESULT = new StmtList(s, sl, loc(sleft, sright)); :}
+         |
+            {: RESULT = null; :}
+         ;
+
+stmt ::= RETURN expr:e SEMI
+            {: RESULT = new ReturnStmt(e, loc(eleft, eright)); :} /*RETURN STATEMENT*/
+         |
+         PRINT expr:e SEMI
+            {: RESULT = new PrintStmt(e, loc(eleft, eright)); :}    /*PRINT STATEMENT*/
+         |
+         IF LPAREN cond:c RPAREN stmt:s
+            {: RESULT = new IfStmt(c, s, loc(cleft, cright));   :}   /*IF STATEMENT*/
+         |
+         IF LPAREN cond:c RPAREN stmt:s1 ELSE stmt:s2
+            {: RESULT = new IfElseStmt(c, s1, s2, loc(cleft, cright));   :}   /*IF ELSE STATEMENT*/
+         |
+         WHILE LPAREN cond:c RPAREN stmt:s                        /*WHILE STATEMENT*/
+            {: RESULT = new WhileStmt(c, s, loc(cleft, cright)); :}
+         |
+         varDecl:d EQUAL expr:e SEMI
+            {: RESULT = new DeclareStmt(d, e, loc(dleft, dright)); :} 
+         | 
+         RCURLY stmtList:sl LCURLY
+            {:  RESULT = sl; :}  
+         |
+         IDENT:i EQUAL expr:e SEMI
+            {: RESULT = new ChangeValStmt(i, e, loc(ileft, iright)); :}
+         |
+         CallExpr:ce SEMI
+            {: RESULT = new MutableCallStatement(ce, loc(celeft, ceright)); :}
+         ;
+      
+expr ::=  NIL:nil
+         {: RESULT = new ConstExpr(null, loc(nilleft, nilright)); :}
+      |  INTCONST:c
+         {: RESULT = new ConstExpr(c, loc(cleft, cright)); :}
+      |  binaryExpr:e
+         {: RESULT = e; :}
+      |  MINUS expr:e            
+         {: RESULT = new UnaryExpr(e, loc(eleft, eright)); :} 
+        %prec UMINUS
+      |  CallExpr:ce
+         {: RESULT = ce; :}
+      |  LPAREN expr:e RPAREN
+         {: RESULT = e; :}   
+      |  IDENT:i 
+         {: RESULT = new IdentExpr(i, loc(ileft, iright)); :}
+      |  LPAREN type:t RPAREN expr:e 
+         {: RESULT = new CastingExpr(t, e, loc(tleft, tright)); :}
+         %prec CAST
+      ;
+
+CallExpr ::=  IDENT:i LPAREN exprList:el RPAREN
+            {: RESULT = new CallExpr(i, el, loc(ileft, iright)); :}
+            ;
+
+
+binaryExpr ::= expr:e1 PLUS expr:e2
+               {: RESULT = new BinaryExpr(e1, BinaryExpr.PLUS, e2, loc(e1left, e1right)); :}
+
+            |  expr:e1 MINUS expr:e2
+               {: RESULT = new BinaryExpr(e1, BinaryExpr.MINUS, e2, loc(e1left, e1right)); :}
+
+            |  expr:e1 MULTIPLY expr:e2 
+               {: RESULT = new BinaryExpr(e1, BinaryExpr.MULTIPLY, e2, loc(e1left, e1right)); :}  
+
+            |  expr:e1 DOT expr:e2 
+               {: RESULT = new BinaryExpr(e1, BinaryExpr.DOTOPERATOR, e2, loc(e1left, e1right)); :}
+            ;
+
+cond ::= LPAREN cond:c RPAREN
+         {: RESULT = c; :}
+         |
+         NOT cond:c
+         {: RESULT = new SingleCompound(c, SingleCompound.NOT, loc(cleft, cright)); :}
+         |
+         expr:e1 GREATER expr:e2 
+            {: RESULT = new BinaryCompound(e1, BinaryCompound.GREATER, e2, loc(e1left, e1right)); :}
+         |
+         expr:e1 LESS expr:e2 
+            {: RESULT = new BinaryCompound(e1, BinaryCompound.LESS, e2, loc(e1left, e1right)); :}
+         |
+         expr:e1 SAME expr:e2 
+            {: RESULT = new BinaryCompound(e1, BinaryCompound.EQUAL, e2, loc(e1left, e1right)); :}
+         |
+         expr:e1 LESSEQUAL expr:e2 
+         {: RESULT = new BinaryCompound(e1, BinaryCompound.LESSEQUAL, e2, loc(e1left, e1right)); :}  
+         |
+         expr:e1 GREATEREQUAL expr:e2 
+         {: RESULT = new BinaryCompound(e1, BinaryCompound.GREATEREQUAL, e2, loc(e1left, e1right)); :}  
+         |
+         expr:e1 NOTEQUAL expr:e2 
+         {: RESULT = new BinaryCompound(e1, BinaryCompound.NOT, e2, loc(e1left, e1right)); :}  
+         |
+         cond:c1 AND cond:c2 
+         {: RESULT = new BinaryCondCompound(c1, BinaryCondCompound.AND, c2, loc(c1left, c1right)); :}  
+         |
+         cond:c1 OR cond:c2
+         {: RESULT = new BinaryCondCompound(c1, BinaryCondCompound.OR, c2, loc(c1left, c1right)); :}  
+         ;
+         
