@@ -14,7 +14,7 @@ public class Interpreter {
     public static final int EXIT_STATIC_CHECKING_ERROR = 2;
     public static final int EXIT_DYNAMIC_TYPE_ERROR = 3;
     public static final int EXIT_NIL_REF_ERROR = 4;
-    public static final int EXIT_QUANDARY_HEAP_OUT_OF_MEMORY_ERROR = 5;
+    public static final int EXIT_AURELIUS_HEAP_OUT_OF_MEMORY_ERROR = 5;
     public static final int EXIT_DATA_RACE_ERROR = 6;
     public static final int EXIT_NONDETERMINISM_ERROR = 7;
 
@@ -29,7 +29,7 @@ public class Interpreter {
         long heapBytes = 1 << 14;
         int i = 0;
         String filename;
-        long quandaryArg;
+        long auArg;
         try {
             for (; i < args.length; i++) {
                 String arg = args[i];
@@ -51,9 +51,9 @@ public class Interpreter {
                 }
             }
             filename = args[i];
-            quandaryArg = Long.valueOf(args[i + 1]);
+            auArg = Long.valueOf(args[i + 1]);
         } catch (Exception ex) {
-            System.out.println("Expected format: quandary [OPTIONS] QUANDARY_PROGRAM_FILE INTEGER_ARGUMENT");
+            System.out.println("Expected format: aurelius [OPTIONS] AURELIUS_PROGRAM_FILE INTEGER_ARGUMENT");
             System.out.println("Options:");
             System.out.println("  -gc (MarkSweep|Explicit|NoGC)");
             System.out.println("  -heapsize BYTES");
@@ -75,7 +75,7 @@ public class Interpreter {
         }
         //astRoot.println(System.out);
         interpreter = new Interpreter(astRoot);
-        Object returnValue = interpreter.exec(gcType, heapBytes, quandaryArg).toString();
+        Object returnValue = interpreter.exec(gcType, heapBytes, auArg).toString();
         System.out.println("Interpreter returned " + returnValue);
     }
 

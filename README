@@ -16,6 +16,6 @@ To build the lexer, parser, and interpreter:
 
 To run the interpreter:
 
-  ./quandary [OPTIONS] QUANDARY_PROGRAM INTEGER_ARG_TO_MAIN
+  ./aurelius [OPTIONS] AURELIUS_PROGRAM INTEGER_ARG_TO_MAIN
 
 Run without any arguments to see supported options.

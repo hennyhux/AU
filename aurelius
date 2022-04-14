@@ -12,4 +12,4 @@ popd > /dev/null
 
 java -cp "$CUP_DIR/java-cup-11b-runtime.jar:$MYDIR" -ss1g -ea interpreter.Interpreter $*
 
-echo Quandary process returned $?
+echo Aurelius process returned $?
